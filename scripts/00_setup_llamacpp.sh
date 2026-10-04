@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Stage 0 -- vendor and build llama.cpp with CUDA for this machine only.
+# Stage 0 -- vendor and build llama.cpp with HIP/ROCm for AMD RX 7600 (gfx1102).
 #
 # Pinned to a specific commit (ADR 0011): a converter change must never silently alter
-# results between runs. CMAKE_CUDA_ARCHITECTURES=86 targets Ampere alone (RTX 3070 Ti), which
+# results between runs. AMDGPU_TARGETS=gfx1102 targets RDNA3 (RX 7600) alone, which
 # cuts build time substantially versus compiling every architecture.
 set -euo pipefail
 
 LLAMA_DIR="${LLAMA_DIR:-vendor/llama.cpp}"
 LLAMA_REPO="${LLAMA_REPO:-https://github.com/ggml-org/llama.cpp.git}"
-CUDA_ARCH="${CUDA_ARCH:-86}"
+AMDGPU_TARGET="${AMDGPU_TARGET:-gfx1102}"
 
 # cmake is installed into the project venv (dev extra) so no system package is needed.
 if [ -z "${CMAKE:-}" ]; then
@@ -47,28 +47,12 @@ if [ -z "${LLAMA_COMMIT:-}" ]; then
   echo ">>   export LLAMA_COMMIT=$HEAD_SHA"
 fi
 
-# Hosts without a system CUDA toolkit can keep one in a local prefix (CUDA_PREFIX, e.g. a
-# micromamba env with cuda-nvcc, cuda-cudart-dev and libcublas-dev). Its lib dir is baked
-# into the binaries' rpath so they run without LD_LIBRARY_PATH.
-CUDA_PREFIX="${CUDA_PREFIX:-vendor/cuda}"
-CUDA_ARGS=()
-if [ -x "$CUDA_PREFIX/bin/nvcc" ]; then
-  CUDA_PREFIX="$(cd "$CUDA_PREFIX" && pwd)"
-  echo ">> using local CUDA toolkit at $CUDA_PREFIX"
-  export PATH="$CUDA_PREFIX/bin:$PATH"
-  CUDA_ARGS=(
-    -DCMAKE_CUDA_COMPILER="$CUDA_PREFIX/bin/nvcc"
-    -DCUDAToolkit_ROOT="$CUDA_PREFIX"
-    -DCMAKE_BUILD_RPATH="$CUDA_PREFIX/lib"
-  )
-fi
-
-echo ">> configuring (CUDA, sm_$CUDA_ARCH)"
+# Configuração para compilação HIP/ROCm (AMD)
+echo ">> configuring (HIP/ROCm, target: $AMDGPU_TARGET)"
 "$CMAKE" -S "$LLAMA_DIR" -B "$LLAMA_DIR/build" \
   -DCMAKE_BUILD_TYPE=Release \
-  "${CUDA_ARGS[@]}" \
-  -DGGML_CUDA=ON \
-  -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCH" \
+  -DGGML_HIPBLAS=ON \
+  -DAMDGPU_TARGETS="$AMDGPU_TARGET" \
   -DLLAMA_CURL=OFF \
   -DLLAMA_BUILD_TESTS=OFF
 
@@ -85,4 +69,4 @@ done
 [ -f "$LLAMA_DIR/convert_hf_to_gguf.py" ] || {
   echo "FATAL: convert_hf_to_gguf.py missing" >&2; exit 1; }
 
-echo ">> llama.cpp ready"
+echo ">> llama.cpp ready (ROCm/HIP)"

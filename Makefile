@@ -1,12 +1,18 @@
 CONFIG ?= configs/qwen3-8b-personas.yaml
 UV     ?= uv
 
+# Variável essencial para RX 7600 (RDNA 3 / gfx1102)
+# Exporta para todas as receitas do Makefile
+export HSA_OVERRIDE_GFX_VERSION ?= 11.0.0
+
 .PHONY: setup data train export serve eval report smoke test clean
 
 setup:
 	$(UV) sync --extra train --extra eval --extra dev
-	$(UV) run python -c "import torch; assert torch.cuda.is_available(), 'CUDA not visible to torch'; print('torch', torch.__version__, '|', torch.cuda.get_device_name(0))"
-	bash scripts/00_setup_cuda.sh
+	# 2. Validação de detecção do ROCm no PyTorch
+	$(UV) run python -c "import torch; assert torch.cuda.is_available(), 'GPU AMD não visível ao torch via ROCm'; print('PyTorch ROCm/HIP:', torch.version.hip, '| GPU:', torch.cuda.get_device_name(0))"
+	# 3. Execução dos scripts adaptados para AMD
+	@if [ -f scripts/00_setup_rocm.sh ]; then bash scripts/00_setup_rocm.sh; fi
 	bash scripts/00_setup_llamacpp.sh
 
 data:

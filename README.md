@@ -195,6 +195,14 @@ make eval     # sequential base-vs-tuned scoring
 make report   # outputs/eval/report.html
 ```
 
+### Learning with a light model
+
+`configs/qwen3-0.6b-personas.yaml` runs the same pipeline on Qwen3-0.6B in minutes
+(`make train CONFIG=configs/qwen3-0.6b-personas.yaml`, same for the other stages), keeping its
+data and outputs under `data/qwen3-0.6b` and `outputs/qwen3-0.6b`. The guide
+[docs/guides/adapting-to-a-new-niche.md](docs/guides/adapting-to-a-new-niche.md) explains each
+stage and how to adapt the pipeline to another niche ([ADR 0017](docs/adr/0017-light-model-config-for-learning.md)).
+
 ## Requirements
 
 An AMD RX 7600 8GB with ROCm 7.1 (~8GB visible). Training peak and serving VRAM on this card are not yet measured: the first smoke run hit an OOM at step 1 with the desktop resident (~1.28GB), so train from a TTY or with the browser closed ([ADR 0015](docs/adr/0015-target-hardware-rx-7600-rocm.md)). 23GB RAM · 60GB free disk · a C++ compiler.

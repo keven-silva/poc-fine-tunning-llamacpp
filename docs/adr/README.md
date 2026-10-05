@@ -18,6 +18,7 @@
 | [0014](0014-training-qwen3-8b-on-8gb.md) | Training Qwen3-8B on 8GB: standard 4-bit, batch 1, no in-training eval | Accepted |
 | [0015](0015-target-hardware-rx-7600-rocm.md) | Target hardware: RX 7600 8GB on ROCm 7.1; torch wheel must match host ROCm | Accepted |
 | [0016](0016-llamacpp-hip-local-toolchain.md) | llama.cpp built with HIP from a project-local toolchain | Accepted |
+| [0017](0017-light-model-config-for-learning.md) | A Qwen3-0.6B config for learning, with its own data and output folders | Accepted |
 
 New decisions get the next number. ADRs are immutable once Accepted — a reversal is a new
 ADR that supersedes the old one.

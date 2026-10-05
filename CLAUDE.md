@@ -11,6 +11,7 @@ constraints and ADR 0015/0016 for the ROCm migration.
 
 - [`docs/superpowers/specs/2026-09-12-persona-finetune-design.md`](docs/superpowers/specs/2026-09-12-persona-finetune-design.md) — the design
 - [`docs/adr/README.md`](docs/adr/README.md) — why each choice was made
+- [`docs/guides/adapting-to-a-new-niche.md`](docs/guides/adapting-to-a-new-niche.md) — the pipeline explained stage by stage, the light 0.6B config (ADR 0017), and what is niche-specific
 
 ## Hardware and environment
 

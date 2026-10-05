@@ -14,8 +14,10 @@
 | [0010](0010-evaluation-strategy.md) | Automatic metrics plus side-by-side | Accepted |
 | [0011](0011-python-env-and-pinning.md) | Isolated uv env on Python 3.12, pinned | Accepted |
 | [0012](0012-revised-training-budget.md) | Revised budget: 10k examples (measured throughput) | Accepted |
-| [0013](0013-target-hardware-rtx-3070-ti.md) | Target hardware: RTX 3070 Ti 8GB | Accepted, amended by 0014 |
+| [0013](0013-target-hardware-rtx-3070-ti.md) | Target hardware: RTX 3070 Ti 8GB | Superseded by 0015 |
 | [0014](0014-training-qwen3-8b-on-8gb.md) | Training Qwen3-8B on 8GB: standard 4-bit, batch 1, no in-training eval | Accepted |
+| [0015](0015-target-hardware-rx-7600-rocm.md) | Target hardware: RX 7600 8GB on ROCm 7.1; torch wheel must match host ROCm | Accepted |
+| [0016](0016-llamacpp-hip-local-toolchain.md) | llama.cpp built with HIP from a project-local toolchain | Accepted |
 
 New decisions get the next number. ADRs are immutable once Accepted — a reversal is a new
 ADR that supersedes the old one.

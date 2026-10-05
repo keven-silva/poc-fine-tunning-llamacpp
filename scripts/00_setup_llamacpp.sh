@@ -7,6 +7,19 @@
 set -euo pipefail
 
 LLAMA_DIR="${LLAMA_DIR:-vendor/llama.cpp}"
+# Pin: an exported LLAMA_COMMIT wins; otherwise read llamacpp.commit from the config.
+CONFIG="${CONFIG:-configs/qwen3-8b-personas.yaml}"
+if [ -n "${LLAMA_COMMIT:-}" ]; then
+  echo ">> pinned commit from environment: $LLAMA_COMMIT"
+else
+  LLAMA_COMMIT="$(awk '/^llamacpp:/{f=1;next} f&&/^[^ #]/{f=0} f&&/^[ ]+commit:/{gsub(/["'"'"' ]/,"",$2);print $2;exit}' "$CONFIG" 2>/dev/null || true)"
+  if [ -n "$LLAMA_COMMIT" ]; then
+    echo ">> pinned commit from $CONFIG (llamacpp.commit): $LLAMA_COMMIT"
+  else
+    unset LLAMA_COMMIT
+  fi
+fi
+export LLAMA_COMMIT
 LLAMA_REPO="${LLAMA_REPO:-https://github.com/ggml-org/llama.cpp.git}"
 AMDGPU_TARGET="${AMDGPU_TARGET:-gfx1102}"
 ROCM_VENDOR_DIR="$(cd "${ROCM_VENDOR_DIR:-vendor/rocm}" 2>/dev/null && pwd)" \

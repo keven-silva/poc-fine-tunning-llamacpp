@@ -17,7 +17,7 @@ constraints and ADR 0015/0016 for the ROCm migration.
 | | |
 |---|---|
 | GPU | Radeon RX 7600 **8GB** (gfx1102), ~8.0GB visible |
-| RAM / disk | 31GB / 259GB free |
+| RAM / disk | 23GB / check `df`; the export stage needs ~50GB at peak |
 | ROCm | host 7.1.1 (`/opt/rocm-7.1.1`); torch 2.11.0 wheel from the `rocm7.1` index; HIP toolchain in `vendor/rocm` (~4GB) |
 | Python | always use the project `uv` venv on 3.12, never the host Python |
 
@@ -77,14 +77,14 @@ Serving VRAM for Q4_K_M 8B on this card is also not measured (~5.5GB on the 3070
 ## Operational gotchas found the hard way
 
 - **System RAM, not VRAM, killed the first training run.** torch inductor spawns one
-  compile worker per CPU core (16 here) when kernels are JIT-compiled at the first step.
+  compile worker per CPU core (12 here) when kernels are JIT-compiled at the first step.
   `scripts/02_train.py` caps `TORCHINDUCTOR_COMPILE_THREADS=4` before importing torch.
   Keep that cap, and keep it above the torch import.
 - **Never pin `unsloth` without pinning `unsloth-zoo`.** They move together. Pinning one
   resolved an 8-month-old Unsloth against transformers 5.17, whose zoo needed a torch
   symbol that did not exist yet. Let the resolver pick the coupled set as a unit.
 - **`torchvision` must come from the same index as `torch`.** transformers imports it, and
-  a build against a different CUDA major aborts the import. It is declared as a direct
+  a build against a different ROCm release aborts the import. It is declared as a direct
   dependency purely so `[tool.uv.sources]` applies — source mappings do not reach
   transitive dependencies.
 - **`datasets` streaming aborts the process at interpreter shutdown**, turning a
@@ -93,7 +93,9 @@ Serving VRAM for Q4_K_M 8B on this card is also not measured (~5.5GB on the 3070
 - **The llama.cpp build needs `hipcc`, which the host does not ship** (runtime only, no
   sudo). `scripts/00_setup_rocm.sh` extracts AMD's 7.1.1 packages into `vendor/rocm` (~4GB)
   and overlays them on the host tree; `00_setup_llamacpp.sh` then asserts the binaries find
-  the GPU with `LD_LIBRARY_PATH` unset.
+  the GPU with `LD_LIBRARY_PATH` unset. Only `vendor/rocm/debs/<ver>` (~1.2GB) is
+  deletable after the build; `vendor/rocm/extract-<ver>` (~2.8GB) must stay, because the
+  binaries' RUNPATH points into it (`libhipblas.so.3` lives only there).
 - **The torch wheel's HIP runtime must match the host ROCm.** The `rocm7.14` wheel
   segfaulted (exit 139) at the first kernel on a 7.1.1 host while
   `torch.cuda.is_available()` was still `True`. `make setup` runs a real matmul

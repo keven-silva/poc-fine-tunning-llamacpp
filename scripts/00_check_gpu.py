@@ -32,7 +32,7 @@ def main() -> int:
     print(f">> torch {torch.__version__}, HIP {wheel_hip}, device {torch.cuda.get_device_name(0)}")
     print(f">> host ROCm trees: {', '.join(hosts) or 'none found'}")
     minor = ".".join(wheel_hip.split(".")[:2])
-    if hosts and not any(h.startswith(minor) for h in hosts):
+    if hosts and not any(h.split(".")[:2] == wheel_hip.split(".")[:2] for h in hosts):
         print(f"WARNING: wheel HIP {wheel_hip} does not match any host ROCm ({', '.join(hosts)}). "
               "A mismatch can segfault at the first kernel; see ADR 0015.", file=sys.stderr)
 

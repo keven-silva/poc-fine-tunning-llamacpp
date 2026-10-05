@@ -43,9 +43,6 @@ def test_lock_resolves_the_rocm71_wheel_and_no_foreign_runtimes():
         assert pkgs[name]["source"] == {"registry": "https://download.pytorch.org/whl/rocm7.1"}
 
 
-import re
-
-
 def test_makefile_has_no_hsa_overrides():
     makefile = _read("Makefile")
     for var in ("HSA_OVERRIDE_GFX_VERSION", "HIPBLASLT_ENABLE_CK",
@@ -125,6 +122,19 @@ def test_no_nvidia_text_left_in_live_files():
                  "scripts/00_setup_llamacpp.sh", "scripts/00_setup_rocm.sh"):
         text = _read(path)
         assert "RTX" not in text and "CUDA" not in text.replace("PYTORCH_CUDA_ALLOC_CONF", ""), path
+    # CLAUDE.md legitimately mentions CUDA historically; only the stale phrases are banned.
+    for path in ("pyproject.toml", "CLAUDE.md"):
+        text = _read(path)
+        for stale in ("different CUDA major", "CUDA toolkit", "nvcc", "vendor/cuda"):
+            assert stale not in text, (path, stale)
+
+
+def test_llamacpp_setup_reads_the_pin_from_the_config():
+    text = _read("scripts/00_setup_llamacpp.sh")
+    assert "configs/qwen3-8b-personas.yaml" in text
+    assert "llamacpp" in text and "commit:" in text
+    cfg_text = _read("configs/qwen3-8b-personas.yaml")
+    assert re.search(r"^llamacpp:\n(?:[ #].*\n)*?  commit: \"[0-9a-f]{40}\"", cfg_text, re.M)
 
 
 def test_claude_md_describes_the_current_hardware():

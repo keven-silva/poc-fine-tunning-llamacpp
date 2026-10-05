@@ -64,7 +64,7 @@ decode:
   seed: 3407
 
 llamacpp:
-  # Recorded after the first `make setup`; export LLAMA_COMMIT to pin the build.
+  # Read by scripts/00_setup_llamacpp.sh (an exported LLAMA_COMMIT overrides it).
   commit: "bdeb855b30dfe7f6e695cba98445a7ba09e6416e"
 
 paths:

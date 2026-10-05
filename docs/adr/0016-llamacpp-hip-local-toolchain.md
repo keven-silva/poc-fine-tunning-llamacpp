@@ -36,7 +36,8 @@ symlink copy of `/opt/rocm-7.1.1` built llama.cpp `bdeb855` for gfx1102 in 4m32s
 ## Consequences
 
 - ~4GB under `vendor/rocm` (not tracked by git): the downloaded packages plus the extracted
-  tree.
+  tree. Only `debs/<ver>` (~1.2GB) is deletable after the build; `extract-<ver>` (~2.8GB)
+  must stay, because the binaries' RUNPATH points at it and `libhipblas.so.3` lives only there.
 - The toolchain version follows the host ROCm install; a host upgrade changes what is
   downloaded on the next `make setup`.
 - Needs network access to `repo.radeon.com` the first time; the script stops with the URL

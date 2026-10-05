@@ -7,7 +7,7 @@
 # symlink copy of the host tree. Nothing outside vendor/rocm is modified.
 set -euo pipefail
 
-ROCM_VERSION="${ROCM_VERSION:-$(ls -d /opt/rocm-[0-9]* 2>/dev/null | sed 's|.*/rocm-||' | sort -V | tail -1)}"
+ROCM_VERSION="${ROCM_VERSION:-$( { ls -d /opt/rocm-[0-9]* 2>/dev/null || true; } | sed 's|.*/rocm-||' | sort -V | tail -1)}"
 [ -n "$ROCM_VERSION" ] || { echo "FATAL: no /opt/rocm-<version> on this host." >&2; exit 1; }
 HOST_ROCM="/opt/rocm-$ROCM_VERSION"
 [ -d "$HOST_ROCM" ] || { echo "FATAL: $HOST_ROCM not found." >&2; exit 1; }

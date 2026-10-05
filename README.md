@@ -4,7 +4,7 @@ Fine-tunes Qwen3-8B with Unsloth QLoRA on `nvidia/Nemotron-Personas-Brazil`, exp
 GGUF, and evaluates against the base model through llama.cpp. Everything runs on one GPU:
 first an RTX 3060 12GB, then an RTX 3070 Ti 8GB, and now, in this fork, a **Radeon RX 7600 8GB** (ROCm 7.1).
 
-On 8GB, training fits with the standard 4-bit checkpoint, batch 1 and in-training
+On 8GB, training fits on the 3070 Ti with the standard 4-bit checkpoint, batch 1 and in-training
 evaluation off, at a 7.1GB peak. See [ADR 0013](docs/adr/0013-target-hardware-rtx-3070-ti.md)
 and [ADR 0014](docs/adr/0014-training-qwen3-8b-on-8gb.md).
 
@@ -133,7 +133,7 @@ Measured end to end on each card.
 
 | Stage | Command | RTX 3070 Ti 8GB | RTX 3060 12GB | Produces |
 |---|---|---|---|---|
-| Environment + llama.cpp HIP build | `make setup` | ~25 min* | ~25 min* | venv + `llama-server`/`quantize`/`perplexity` |
+| Environment + llama.cpp CUDA build | `make setup` | ~25 min* | ~25 min* | venv + `llama-server`/`quantize`/`perplexity` |
 | Data preparation | `make data` | ~2 min* | ~3 min* | 10k/500/200 JSONL splits |
 | **Fine-tuning (QLoRA)** | `make train` | **4h 26m** | **7h 25m** | 344 MB LoRA adapter |
 | GGUF export (per model) | `make export` | **6 min 13 s** | **6 min 26 s** | 4.7 GB Q4_K_M + 8.1 GB Q8_0 |
@@ -197,7 +197,7 @@ make report   # outputs/eval/report.html
 
 ## Requirements
 
-An AMD RX 7600 8GB with ROCm 7.1 (~8GB visible). Training peak and serving VRAM on this card are not yet measured: the first smoke run hit an OOM at step 1 with the desktop resident (~1.28GB), so train from a TTY or with the browser closed ([ADR 0015](docs/adr/0015-target-hardware-rx-7600-rocm.md)). 30GB RAM · 60GB free disk · a C++ compiler.
+An AMD RX 7600 8GB with ROCm 7.1 (~8GB visible). Training peak and serving VRAM on this card are not yet measured: the first smoke run hit an OOM at step 1 with the desktop resident (~1.28GB), so train from a TTY or with the browser closed ([ADR 0015](docs/adr/0015-target-hardware-rx-7600-rocm.md)). 23GB RAM · 60GB free disk · a C++ compiler.
 
 Host Python is not used — `uv` manages a project-local 3.12 environment, and `cmake`
 is installed into it. If the host has the ROCm 7.1.1 runtime but no compiler, `make setup`
@@ -207,8 +207,8 @@ needed is a C++ compiler.
 ## Pinning llama.cpp
 
 The commit built and verified for this fork is recorded in
-`configs/qwen3-8b-personas.yaml` (`llamacpp.commit`). Export it so builds stay
-reproducible:
+`configs/qwen3-8b-personas.yaml` (`llamacpp.commit`). `00_setup_llamacpp.sh` reads
+it from there, so exporting is optional. An explicitly exported `LLAMA_COMMIT` wins:
 
 ```bash
 export LLAMA_COMMIT=bdeb855b30dfe7f6e695cba98445a7ba09e6416e

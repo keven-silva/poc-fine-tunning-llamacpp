@@ -51,7 +51,12 @@ touching the 8B config or its results, changing any invariant in `CLAUDE.md`.
 - Output names are fixed per outputs directory (`personas-{base,tuned}-q4_k_m.gguf`,
   `merged-16bit-*`, `adapter/`), so separation must come from `paths.*`, not from file names.
 - The 8B config's tight settings (batch 1, `max_seq_length: 1536`, `eval_strategy: "no"`)
-  exist only because of 8GB (ADR 0014). They do not apply to a 0.6B model.
+  exist only because of 8GB (ADR 0014). `max_seq_length` does not apply to a 0.6B model.
+- **Measured, correcting an earlier claim:** the first real run with batch 4 x 4 at
+  `max_seq_length: 2048` took ~60 s per optimizer step (ETA ~2h10) with VRAM at 7.89 of 8.0 GB.
+  The fp32 logits over the 151,936-token vocabulary do not depend on model size, so the claim
+  that ADR 0014's constraints "do not apply" to a 0.6B model was wrong for batch size. The
+  config keeps batch 1 x 16.
 - **Disk is the binding constraint.** The host has ~5.5GB free (2026-10-05). Qwen3-0.6B needs
   about 5GB at peak (fp16 base 1.2GB, merged 1.2GB, f16 GGUF 1.2GB, Q4 ~0.4GB, caches); 1.7B
   needs ~12GB and 4B ~25GB.
@@ -68,8 +73,8 @@ touching the 8B config or its results, changing any invariant in `CLAUDE.md`.
 | `model.train_id` | `unsloth/Qwen3-8B-bnb-4bit` | `unsloth/Qwen3-0.6B-bnb-4bit` | standard 4-bit checkpoint, loaded with `use_exact_model_name` as today |
 | `model.max_seq_length` | 1536 | 2048 | the 1536 cap was a VRAM workaround |
 | `data.n_train` | 10000 | 2000 | minutes, not hours; still a visible effect |
-| `train.per_device_train_batch_size` / `gradient_accumulation_steps` | 1 / 16 | 4 / 4 | same effective batch 16, better throughput |
-| `train.eval_strategy` | `"no"` | `"steps"` | the logits OOM of ADR 0014 does not apply; the learner sees validation loss |
+| `train.per_device_train_batch_size` / `gradient_accumulation_steps` | 1 / 16 | 1 / 16 (unchanged) | measured: batch 4 at 2048 ran ~60 s/step with VRAM at 7.89/8.0 GB; logits over the vocabulary cost the same at any model size |
+| `train.eval_strategy` | `"no"` | `"steps"` | on again: `prediction_loss_only` plus eval batch 1 keeps the pass small; the learner sees validation loss |
 | Cadence: `train.logging_steps` / `eval_steps` / `save_steps` / `save_total_limit` | 10 / 100 / 250 / 3 | 5 / 25 / 100 / 1 | 125 optimizer steps; disk is tight; no effect on the model |
 | `paths.data_dir` | `data` | `data/qwen3-0.6b` | no clobbering |
 | `paths.outputs_dir` | `outputs` | `outputs/qwen3-0.6b` | no clobbering |
@@ -143,7 +148,7 @@ implemented features.
 ### 3.5 ADR 0017
 
 Records: the 0.6B config as a learning configuration; separate `paths.*` rather than separate
-file names; which ADR 0014 constraints do not apply and why; the measured numbers from the
+file names; which ADR 0014 constraints do and do not apply and why (batch size does, sequence length does not); the measured numbers from the
 run; disk as the constraint on larger models; the rejected alternative of refactoring to a
 multi-task framework now. Marks no earlier ADR superseded; it adds a configuration.
 
@@ -172,5 +177,5 @@ multi-task framework now. Marks no earlier ADR superseded; it adds a configurati
 ## 6. Open questions
 
 None blocking. Measured during the run and written into ADR 0017: whether `eval_strategy:
-"steps"` is affordable at batch 4 on this card with the desktop resident, and the real
+"steps"` is affordable at batch 1 on this card with the desktop resident, and the real
 training time for 2000 rows.

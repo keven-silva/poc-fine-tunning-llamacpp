@@ -2,13 +2,15 @@
 # Qwen3-0.6B. It trains in minutes, so every stage can be run and read end to end.
 #
 # Only these things differ from configs/qwen3-8b-personas.yaml: the model ids, the sequence
-# length, the number of training rows, the batch shape (same effective batch of 16), in-training
-# evaluation (on again: the 8B config turned it off only to fit 8GB, ADR 0014), the two
+# length, the number of training rows, in-training evaluation (on again, see below), the two
 # paths, and four cadence keys: logging_steps 5, eval_steps 25, save_steps 100 and
 # save_total_limit 1 (8B: 10, 100, 250, 3). Reason: only 125 optimizer steps, so log every 5
 # and evaluate every 25; disk is tight, so keep one checkpoint, saved at step 100. The cadence
 # keys change only how often things are logged, validated and saved, not the model or the
 # comparison. Everything else is identical on purpose, so comparing the two isolates model size.
+# The batch shape is the SAME as the 8B (1 x 16): a batch of 4 at 2048 tokens measured ~60 s per
+# optimizer step with VRAM at 7.89 of 8.0 GB, because the fp32 logits over the 151,936-token
+# vocabulary cost the same whatever the model size (ADR 0014).
 #
 # To move to a bigger model, edit ONLY model.base_id, model.train_id, paths.data_dir and
 # paths.outputs_dir. Free disk needed at peak for the export stage: 0.6B ~5GB, 1.7B ~12GB,
@@ -41,10 +43,11 @@ lora:
   random_state: 3407
 
 train:
-  # Effective batch 16, as in the 8B config, but 4 sequences at a time: a 0.6B model has room.
-  per_device_train_batch_size: 4
-  per_device_eval_batch_size: 4
-  gradient_accumulation_steps: 4
+  # Same batch shape as the 8B config (effective batch 16). Batch 4 at 2048 tokens was measured
+  # at ~60 s/step with VRAM at the limit: the logits over the vocabulary do not shrink with the model.
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 16
   group_by_length: true
   num_train_epochs: 1
   learning_rate: 2.0e-4
@@ -54,7 +57,8 @@ train:
   weight_decay: 0.01
   # 2000 rows / batch 16 = 125 optimizer steps: log often so the loss curve is readable.
   logging_steps: 5
-  # On: the fp32-logits OOM of ADR 0014 belongs to the 8B model. 125 steps / 25 = 5 readings.
+  # On again: scripts/02_train.py sets prediction_loss_only, and batch 1 keeps the pass small.
+  # 125 steps / 25 = 5 readings.
   eval_strategy: "steps"
   eval_steps: 25
   eval_subset_rows: 150

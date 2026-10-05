@@ -69,8 +69,8 @@ aprendizado.
 | `model.base_id` / `train_id` | Qwen3-8B | Qwen3-0.6B | o objetivo do exercício |
 | `model.max_seq_length` | 1536 | 2048 | o limite do 8B era para caber em 8GB |
 | `data.n_train` | 10000 | 2000 | minutos em vez de horas |
-| batch × acumulação | 1 × 16 | 4 × 4 | mesmo batch efetivo (16); o modelo pequeno tem folga |
-| `train.eval_strategy` | `"no"` | `"steps"` | o OOM da avaliação (ADR 0014) era do 8B |
+| batch × acumulação | 1 × 16 | 1 × 16 | idêntico: os logits sobre o vocabulário (151.936 tokens) custam a mesma memória em qualquer tamanho de modelo (medido: batch 4 × 2048 rodou a ~60 s/passo com a VRAM no limite) |
+| `train.eval_strategy` | `"no"` | `"steps"` | avaliação ligada de novo: `prediction_loss_only` e batch 1 mantêm o custo baixo |
 | `paths.*` | `data`, `outputs` | `data/qwen3-0.6b`, `outputs/qwen3-0.6b` | não sobrescrever o 8B |
 
 Todo o resto é idêntico (LoRA, learning rate, decodificação, sementes). Assim, comparar os dois

@@ -111,8 +111,9 @@ def test_light_config_is_the_8b_task_with_only_the_documented_differences():
     assert light.data.hf_dataset == heavy.data.hf_dataset
     assert light.data.n_train == 2000
     assert (light.data.n_val, light.data.n_test) == (heavy.data.n_val, heavy.data.n_test)
-    assert light.train.per_device_train_batch_size == 4
-    assert light.train.gradient_accumulation_steps == 4
+    assert light.train.per_device_train_batch_size == 1
+    assert light.train.gradient_accumulation_steps == 16
+    assert light.train.per_device_eval_batch_size == heavy.train.per_device_eval_batch_size == 1
     assert light.train.eval_strategy == "steps"
     assert light.paths.data_dir == "data/qwen3-0.6b"
     assert light.paths.outputs_dir == "outputs/qwen3-0.6b"

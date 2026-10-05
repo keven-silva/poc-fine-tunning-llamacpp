@@ -10,6 +10,8 @@
 
 **Spec:** [docs/superpowers/specs/2026-10-05-light-model-config-and-niche-guide-design.md](../specs/2026-10-05-light-model-config-and-niche-guide-design.md)
 
+> **Amendment (during execution, 2026-10-05):** the first real run of Task 4 with the batch shape written in Tasks 1 and 3 below (4 x 4 at 2048 tokens) measured ~60 s per optimizer step with VRAM at 7.89 of 8.0 GB, so the run was stopped and the shape changed to the 8B's 1 x 16 (train and eval batch 1, `max_seq_length` kept at 2048). The committed config, tests, spec and guide carry the corrected values; the code blocks in Tasks 1 and 3 below still show the original 4 x 4 and are historical. Task 5's ADR text already reflects the correction.
+
 ## Global Constraints
 
 - The 8B config `configs/qwen3-8b-personas.yaml`, its tests, `docs/RESULTS.md` and every accepted ADR body stay untouched. The Makefile default `CONFIG` stays the 8B file.
@@ -837,8 +839,13 @@ project (see the guide).
 
 1. Add `configs/qwen3-0.6b-personas.yaml`: the same persona task on `unsloth/Qwen3-0.6B`,
    trained from `unsloth/Qwen3-0.6B-bnb-4bit`. It differs from the 8B config only in
-   `max_seq_length` (2048), `n_train` (2000), the batch shape (4 × 4, still effective 16),
-   in-training evaluation (`steps`, every 25) and the two paths. LoRA, learning rate,
+   `max_seq_length` (2048), `n_train` (2000), in-training evaluation (`steps`, every 25), the
+   logging, validation and checkpoint cadence (`logging_steps` 5, `eval_steps` 25, `save_steps`
+   100, `save_total_limit` 1: 125 optimizer steps, no effect on the model) and the two paths.
+   The batch shape is the 8B's (1 × 16): a first run with 4 × 4 at 2048 tokens measured ~60 s
+   per optimizer step with VRAM at 7.89 of 8.0 GB, because the fp32 logits over the
+   151,936-token vocabulary cost the same memory at any Qwen3 size (the same cause as
+   ADR 0014), so that shape was abandoned. LoRA, learning rate,
    scheduler, decoding, seeds and the llama.cpp commit are identical, so a comparison between
    the two isolates model size.
 2. Separate the runs by `paths.data_dir` (`data/qwen3-0.6b`) and `paths.outputs_dir`
@@ -878,6 +885,7 @@ project (see the guide).
   the owner's goal is to understand the mechanism first. Deferred as its own project.
 - **Reuse the same output paths with different file names.** Fragile: the scripts derive
   names from the stage, and two runs would still overwrite `adapter/` and the eval results.
+- **Batch 4 × 4 for speed.** Tried first and measured, see Decision 1; ~60 s/step, memory at the limit.
 - **Start from 1.7B.** More capable, but ~12GB at the export peak against ~5GB free disk when
   this was decided.
 ```

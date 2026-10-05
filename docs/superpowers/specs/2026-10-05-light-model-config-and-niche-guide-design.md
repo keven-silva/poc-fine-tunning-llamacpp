@@ -70,6 +70,7 @@ touching the 8B config or its results, changing any invariant in `CLAUDE.md`.
 | `data.n_train` | 10000 | 2000 | minutes, not hours; still a visible effect |
 | `train.per_device_train_batch_size` / `gradient_accumulation_steps` | 1 / 16 | 4 / 4 | same effective batch 16, better throughput |
 | `train.eval_strategy` | `"no"` | `"steps"` | the logits OOM of ADR 0014 does not apply; the learner sees validation loss |
+| Cadence: `train.logging_steps` / `eval_steps` / `save_steps` / `save_total_limit` | 10 / 100 / 250 / 3 | 5 / 25 / 100 / 1 | 125 optimizer steps; disk is tight; no effect on the model |
 | `paths.data_dir` | `data` | `data/qwen3-0.6b` | no clobbering |
 | `paths.outputs_dir` | `outputs` | `outputs/qwen3-0.6b` | no clobbering |
 

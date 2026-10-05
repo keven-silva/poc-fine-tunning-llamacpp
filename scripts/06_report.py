@@ -65,6 +65,11 @@ def metric_row(label: str, base, tuned, lower_is_better: bool = False) -> str:
     return f"<tr><td>{html.escape(label)}</td>{cell(base, tuned)}{cell(tuned, base)}</tr>"
 
 
+def report_title(base_id: str) -> str:
+    """'unsloth/Qwen3-0.6B' -> 'Qwen3-0.6B persona fine-tune'."""
+    return f"{base_id.rsplit('/', 1)[-1]} persona fine-tune"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/qwen3-8b-personas.yaml")
@@ -109,7 +114,7 @@ def main() -> int:
     page = f"""<title>Persona Fine-Tune Results</title>
 <style>{STYLE}</style>
 <div class="wrap">
-<h1>Qwen3-8B persona fine-tune &mdash; base vs tuned</h1>
+<h1>{html.escape(report_title(cfg.model.base_id))} &mdash; base vs tuned</h1>
 <p class="sub">{results['n_rows']} held-out rows &middot; prompt version
 {html.escape(results['prompt_version'])} &middot; Q4_K_M &middot; identical
 decoding parameters</p>

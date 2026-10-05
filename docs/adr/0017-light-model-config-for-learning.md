@@ -41,7 +41,7 @@ project (see the guide).
 
 ## Consequences
 
-- Measured on the RTX 3070 Ti 8GB (2026-10-05), 2000 training rows, 125 optimizer steps at the
+- Measured on the RX 7600 8GB (2026-10-05), 2000 training rows, 125 optimizer steps at the
   1 × 16 shape: training took 2818 s (47 minutes), about 22.5 s per optimizer step by wall
   time (the script measured 21.09 s; early steps ran ~19.5 s and rose to ~33 s around the
   validation passes). The script reported a peak of 7.20 GB of VRAM (reserved memory). Total

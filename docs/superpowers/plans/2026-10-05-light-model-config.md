@@ -12,6 +12,8 @@
 
 > **Amendment (during execution, 2026-10-05):** the first real run of Task 4 with the batch shape written in Tasks 1 and 3 below (4 x 4 at 2048 tokens) measured ~60 s per optimizer step with VRAM at 7.89 of 8.0 GB, so the run was stopped and the shape changed to the 8B's 1 x 16 (train and eval batch 1, `max_seq_length` kept at 2048). The committed config, tests, spec and guide carry the corrected values; the code blocks in Tasks 1 and 3 below still show the original 4 x 4 and are historical. Task 5's ADR text already reflects the correction.
 
+> **Amendment 2 (after execution):** the guide's ninth section on Weights & Biases (Task 3 below, and the W&B constraints and Review Focus item 7) was removed at the owner's request after the branch was finished; the guide has eight sections and `tests/test_guide.py` expects eight and no longer has W&B tests. The Task 3 text below is historical and still shows it.
+
 ## Global Constraints
 
 - The 8B config `configs/qwen3-8b-personas.yaml`, its tests, `docs/RESULTS.md` and every accepted ADR body stay untouched. The Makefile default `CONFIG` stays the 8B file.

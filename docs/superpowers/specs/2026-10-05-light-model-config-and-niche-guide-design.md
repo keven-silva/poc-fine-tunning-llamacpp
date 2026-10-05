@@ -1,7 +1,7 @@
 # Design — Light-model config for learning, and a guide to new niches
 
 - **Date:** 2026-10-05
-- **Status:** Implemented (see docs/superpowers/plans/2026-10-05-light-model-config.md and ADR 0017)
+- **Status:** Implemented (see docs/superpowers/plans/2026-10-05-light-model-config.md and ADR 0017). A ninth guide section on Weights & Biases was written during execution and removed afterwards at the owner's request; the guide has eight sections.
 - **Extends:** [2026-09-12-persona-finetune-design.md](2026-09-12-persona-finetune-design.md) and
   [2026-10-05-rocm-migration-design.md](2026-10-05-rocm-migration-design.md). The task, prompt,
   data source and evaluation are unchanged.
@@ -18,8 +18,6 @@ Deliverables:
 2. `docs/guides/adapting-to-a-new-niche.md`: a Portuguese guide, written for someone who
    wants to learn, explaining each stage and what to replace for a new niche.
 3. `docs/adr/0017-light-model-config-for-learning.md`: the decision record.
-   The guide also explains, as an optional section, how to use Weights & Biases to track and
-   compare runs and evaluations (explained, not integrated: no dependency or pipeline change).
 4. A guard test so a second config can never overwrite the first one's data or outputs.
 5. One small code change: the report title stops hardcoding "Qwen3-8B".
 
@@ -100,7 +98,7 @@ config writes files directly into `data/` and `outputs/` and a dedicated subfold
 `scripts/06_report.py` builds the `<h1>` from `cfg.model.base_id` (the part after `/`) instead
 of the literal "Qwen3-8B". No other change to the report.
 
-### 3.4 The guide (`docs/guides/adapting-to-a-new-niche.md`, Portuguese, nine sections)
+### 3.4 The guide (`docs/guides/adapting-to-a-new-niche.md`, Portuguese, eight sections)
 
 Audience: the repo owner, learning. Plain language, each stage tied to a file. Sections:
 
@@ -135,12 +133,6 @@ Audience: the repo owner, learning. Plain language, each stage tied to a file. S
 8. **Armadilhas que o projeto já pagou:** prompt/template mismatch between training and
    serving, thinking mode, a changed prompt invalidating the adapter, tuned and base needing
    the same quantisation lineage (links to the ADRs).
-
-9. **Weights & Biases (opcional):** setup (`wandb login`, install outside the lock), privacy and
-   the offline mode, an example script that logs `results.json` and `generations.json` after
-   `make eval` (no pipeline change), how to compare the 0.6B and 8B runs, how training curves
-   would be enabled through a `train.report_to` key (needs its own spec and ADR), and when the
-   sibling product Weave is worth it.
 
 The guide describes what exists today and labels the niche sections as design guidance, not
 implemented features.

@@ -1,4 +1,4 @@
-CONFIG ?= configs/qwen3-8b-personas.yaml
+CONFIG ?= configs/qwen3-0.6b-personas.yaml
 UV     ?= uv
 
 # The user's shell may export LD_LIBRARY_PATH entries for ROCm trees that do not exist

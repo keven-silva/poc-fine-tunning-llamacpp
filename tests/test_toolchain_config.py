@@ -93,3 +93,19 @@ def test_rocm_setup_keys_caches_by_version_and_fails_loudly_on_download():
     assert 'EXTRACT="$VENDOR/extract-$ROCM_VERSION"' in text
     assert 'FATAL: cannot download' in text                          # set -e skips `&&` lists
     assert 'curl -fsSL -o "$deb.part" "$REPO/$file" && ' not in text
+
+
+def test_llamacpp_build_uses_current_hip_flags():
+    text = _read("scripts/00_setup_llamacpp.sh")
+    assert "-DGGML_HIP=ON" in text
+    assert "GGML_HIPBLAS" not in text
+    assert "gfx1102" in text
+    assert "--list-devices" in text          # runtime assertion after the build
+    assert "vendor/rocm/prefix" in text or "ROCM_VENDOR_DIR" in text
+    assert subprocess.run(["bash", "-n", str(ROOT / "scripts/00_setup_llamacpp.sh")]).returncode == 0
+
+
+def test_serve_script_clears_ld_library_path_and_has_no_stale_vram_claim():
+    text = _read("scripts/04_serve.sh")
+    assert "unset LD_LIBRARY_PATH" in text
+    assert "9.5GB" not in text

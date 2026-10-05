@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
-# Stage 0 -- vendor and build llama.cpp with HIP/ROCm for AMD RX 7600 (gfx1102).
+# Stage 0 -- vendor and build llama.cpp with HIP/ROCm for the RX 7600 (gfx1102).
 #
 # Pinned to a specific commit (ADR 0011): a converter change must never silently alter
-# results between runs. AMDGPU_TARGETS=gfx1102 targets RDNA3 (RX 7600) alone, which
-# cuts build time substantially versus compiling every architecture.
+# results between runs. AMDGPU_TARGETS=gfx1102 compiles for this GPU alone, which cuts
+# build time substantially. The compiler comes from vendor/rocm (ADR 0016).
 set -euo pipefail
 
 LLAMA_DIR="${LLAMA_DIR:-vendor/llama.cpp}"
 LLAMA_REPO="${LLAMA_REPO:-https://github.com/ggml-org/llama.cpp.git}"
 AMDGPU_TARGET="${AMDGPU_TARGET:-gfx1102}"
+ROCM_VENDOR_DIR="$(cd "${ROCM_VENDOR_DIR:-vendor/rocm}" 2>/dev/null && pwd)" \
+  || { echo "FATAL: vendor/rocm missing. Run: bash scripts/00_setup_rocm.sh" >&2; exit 1; }
+export ROCM_PATH="$ROCM_VENDOR_DIR/prefix" HIP_PATH="$ROCM_VENDOR_DIR/prefix"
+[ -x "$ROCM_PATH/bin/hipcc" ] || { echo "FATAL: $ROCM_PATH/bin/hipcc missing. Run: bash scripts/00_setup_rocm.sh" >&2; exit 1; }
+export PATH="$(pwd)/.venv/bin:$ROCM_PATH/bin:$ROCM_PATH/llvm/bin:$PATH"
+unset LD_LIBRARY_PATH
 
 # cmake is installed into the project venv (dev extra) so no system package is needed.
 if [ -z "${CMAKE:-}" ]; then
@@ -47,12 +53,13 @@ if [ -z "${LLAMA_COMMIT:-}" ]; then
   echo ">>   export LLAMA_COMMIT=$HEAD_SHA"
 fi
 
-# Configuração para compilação HIP/ROCm (AMD)
 echo ">> configuring (HIP/ROCm, target: $AMDGPU_TARGET)"
-"$CMAKE" -S "$LLAMA_DIR" -B "$LLAMA_DIR/build" \
+"$CMAKE" -S "$LLAMA_DIR" -B "$LLAMA_DIR/build" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
-  -DGGML_HIPBLAS=ON \
+  -DGGML_HIP=ON \
   -DAMDGPU_TARGETS="$AMDGPU_TARGET" \
+  -DCMAKE_HIP_COMPILER="$ROCM_PATH/llvm/bin/clang++" \
+  -DCMAKE_PREFIX_PATH="$ROCM_PATH" \
   -DLLAMA_CURL=OFF \
   -DLLAMA_BUILD_TESTS=OFF
 
@@ -68,5 +75,12 @@ done
 
 [ -f "$LLAMA_DIR/convert_hf_to_gguf.py" ] || {
   echo "FATAL: convert_hf_to_gguf.py missing" >&2; exit 1; }
+
+# The binaries must find the GPU with no environment help (rpath only).
+devices="$("$LLAMA_DIR/build/bin/llama-server" --list-devices 2>&1 || true)"
+echo "$devices" | grep -q "ROCm0" || {
+  echo "FATAL: llama-server lists no ROCm device with LD_LIBRARY_PATH unset:" >&2
+  echo "$devices" >&2; exit 1; }
+echo ">> $(echo "$devices" | grep ROCm0)"
 
 echo ">> llama.cpp ready (ROCm/HIP)"

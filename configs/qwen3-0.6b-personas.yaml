@@ -1,0 +1,76 @@
+# Light configuration for learning (ADR 0017): the same persona task as the 8B config, on
+# Qwen3-0.6B. It trains in minutes, so every stage can be run and read end to end.
+#
+# Only these things differ from configs/qwen3-8b-personas.yaml: the model ids, the sequence
+# length, the number of training rows, the batch shape (same effective batch of 16), in-training
+# evaluation (on again: the 8B config turned it off only to fit 8GB, ADR 0014) and the two
+# paths. Everything else is identical on purpose, so comparing the two isolates model size.
+#
+# To move to a bigger model, edit ONLY model.base_id, model.train_id, paths.data_dir and
+# paths.outputs_dir. Free disk needed at peak for the export stage: 0.6B ~5GB, 1.7B ~12GB,
+# 4B ~25GB. Examples: unsloth/Qwen3-1.7B (+ -bnb-4bit), unsloth/Qwen3-4B (+ -bnb-4bit).
+# Use `make <stage> CONFIG=configs/qwen3-0.6b-personas.yaml`.
+
+model:
+  base_id: unsloth/Qwen3-0.6B
+  # Standard bnb 4-bit checkpoint, loaded with use_exact_model_name (as in ADR 0014).
+  # Tokenizer and the fp16 base export still come from base_id.
+  train_id: unsloth/Qwen3-0.6B-bnb-4bit
+  max_seq_length: 2048
+  load_in_4bit: true
+
+data:
+  hf_dataset: nvidia/Nemotron-Personas-Brazil
+  n_train: 2000
+  n_val: 500
+  n_test: 200
+  seed: 3407
+  max_name_drop_rate: 0.05
+
+lora:
+  r: 32
+  lora_alpha: 32
+  lora_dropout: 0.0
+  bias: none
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+  use_gradient_checkpointing: unsloth
+  random_state: 3407
+
+train:
+  # Effective batch 16, as in the 8B config, but 4 sequences at a time: a 0.6B model has room.
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+  gradient_accumulation_steps: 4
+  group_by_length: true
+  num_train_epochs: 1
+  learning_rate: 2.0e-4
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.03
+  optim: adamw_8bit
+  weight_decay: 0.01
+  # 2000 rows / batch 16 = 125 optimizer steps: log often so the loss curve is readable.
+  logging_steps: 5
+  # On: the fp32-logits OOM of ADR 0014 belongs to the 8B model. 125 steps / 25 = 5 readings.
+  eval_strategy: "steps"
+  eval_steps: 25
+  eval_subset_rows: 150
+  save_steps: 100
+  save_total_limit: 1
+  seed: 3407
+
+decode:
+  temperature: 0.7
+  top_p: 0.8
+  top_k: 20
+  repeat_penalty: 1.05
+  n_predict: 1024
+  seed: 3407
+
+llamacpp:
+  # Read by scripts/00_setup_llamacpp.sh (an exported LLAMA_COMMIT overrides it).
+  commit: "bdeb855b30dfe7f6e695cba98445a7ba09e6416e"
+
+paths:
+  data_dir: data/qwen3-0.6b
+  outputs_dir: outputs/qwen3-0.6b
+  llamacpp_dir: vendor/llama.cpp

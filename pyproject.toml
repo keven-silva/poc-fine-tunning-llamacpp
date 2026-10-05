@@ -7,7 +7,7 @@ dependencies = ["pyyaml>=6.0.2"]
 
 [project.optional-dependencies]
 train = [
-    "torch",
+    "torch==2.13.0",
     "torchvision",
     "unsloth",
     "unsloth-zoo",
@@ -30,11 +30,13 @@ dev = [
 ]
 
 
-# torch rocm7.14 wheels: sm_80 is supported and driver 595 is backward compatible with
-# the ROCm 7.14 runtime, so the host's 13.3 toolkit is irrelevant here (ADR 0011).
+# torch rocm7.1 wheels. The wheel's bundled HIP runtime MUST match the host ROCm
+# (7.1.1 in /opt/rocm-7.1.1): the rocm7.14 wheel segfaults in libamdhip64 at the first
+# kernel launch on this host while torch.cuda.is_available() still returns True. This is
+# the opposite of CUDA's backward-compatibility rule in ADR 0011 (see ADR 0015).
 [[tool.uv.index]]
 name = "pytorch-rocm"
-url = "https://download.pytorch.org/whl/rocm7.14"
+url = "https://download.pytorch.org/whl/rocm7.1"
 
 [tool.uv]
 # triton JIT-compiles a C module at the first training step and needs Python.h. A distro
@@ -44,8 +46,7 @@ environments = ["sys_platform == 'linux'"]
 index-strategy = "unsafe-best-match"
 
 [tool.uv.sources]
-# torchvision MUST come from the same index as torch: transformers imports it, and a
-# torchvision built against a different ROCm major version aborts the import.
+# torchvision MUST come from the same index as torch: transformers imports it, and a build against a different ROCm release aborts the import.
 torch = { index = "pytorch-rocm" }
 torchvision = { index = "pytorch-rocm" }
 

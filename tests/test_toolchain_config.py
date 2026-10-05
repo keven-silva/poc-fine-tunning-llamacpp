@@ -78,9 +78,18 @@ def test_rocm_setup_script_is_valid_bash_and_idempotent_by_design():
                 "hipblas-dev", "rocsolver", "hsa-rocr-dev", "rocm-cmake", "rocm-core"):
         assert re.search(rf"\b{re.escape(pkg)}\b", text), pkg
     assert "Packages.gz" in text                 # versions are resolved, never hardcoded
-    assert "$VENDOR/debs/" in text and "-s" in text  # skips already downloaded debs
+    assert "$VENDOR/debs/" in text and '! -s "$deb"' in text  # skips already downloaded debs
     assert "/opt/rocm-" in text                  # follows the host ROCm version
 
 
 def test_no_cuda_setup_remains():
     assert not (ROOT / "scripts/00_setup_cuda.sh").exists()
+
+
+def test_rocm_setup_keys_caches_by_version_and_fails_loudly_on_download():
+    text = (ROOT / "scripts/00_setup_rocm.sh").read_text()
+    assert 'INDEX="$VENDOR/Packages-$ROCM_VERSION-$DIST"' in text   # no stale index reuse
+    assert 'DEBS="$VENDOR/debs/$ROCM_VERSION"' in text
+    assert 'EXTRACT="$VENDOR/extract-$ROCM_VERSION"' in text
+    assert 'FATAL: cannot download' in text                          # set -e skips `&&` lists
+    assert 'curl -fsSL -o "$deb.part" "$REPO/$file" && ' not in text

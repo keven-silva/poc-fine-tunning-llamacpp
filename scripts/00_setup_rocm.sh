@@ -17,31 +17,48 @@ DIST="${ROCM_APT_DIST:-jammy}"
 REPO="https://repo.radeon.com/rocm/apt/$ROCM_VERSION"
 PACKAGES="hip-dev hipcc rocm-llvm rocm-device-libs hipblas hipblas-dev rocsolver hsa-rocr-dev rocm-cmake rocm-core"
 
-mkdir -p "$VENDOR/debs" "$VENDOR/extract"
+# Everything version-dependent is keyed by ROCM_VERSION so a host upgrade never reuses a stale
+# index or mixes old files into the overlay. vendor/rocm/prefix and vendor/rocm/extract stay
+# stable paths for later stages (extract is a symlink to the current version's tree).
+DEBS="$VENDOR/debs/$ROCM_VERSION"
+EXTRACT="$VENDOR/extract-$ROCM_VERSION"
+INDEX="$VENDOR/Packages-$ROCM_VERSION-$DIST"
+# one-off migration of the pre-keyed layout (same version only; keeps downloads)
+if [ -d "$VENDOR/extract" ] && [ ! -L "$VENDOR/extract" ] && [ ! -e "$EXTRACT" ]; then
+  mv "$VENDOR/extract" "$EXTRACT"
+fi
+if [ -d "$VENDOR/debs" ] && [ ! -d "$DEBS" ] && ls "$VENDOR"/debs/*.deb >/dev/null 2>&1; then
+  mkdir -p "$DEBS" && mv "$VENDOR"/debs/*.deb "$DEBS"/
+fi
+[ -e "$VENDOR/Packages" ] && [ ! -e "$INDEX" ] && mv "$VENDOR/Packages" "$INDEX"
+mkdir -p "$DEBS" "$EXTRACT"
+ln -sfn "extract-$ROCM_VERSION" "$VENDOR/extract"
 echo ">> host ROCm $ROCM_VERSION; fetching missing HIP toolchain from $REPO ($DIST)"
 
-if [ ! -s "$VENDOR/Packages" ]; then
-  curl -fsSL "$REPO/dists/$DIST/main/binary-amd64/Packages.gz" | gunzip > "$VENDOR/Packages.tmp" \
+if [ ! -s "$INDEX" ]; then
+  curl -fsSL "$REPO/dists/$DIST/main/binary-amd64/Packages.gz" | gunzip > "$INDEX.tmp" \
     || { echo "FATAL: cannot fetch $REPO/dists/$DIST/main/binary-amd64/Packages.gz" >&2; exit 1; }
-  mv "$VENDOR/Packages.tmp" "$VENDOR/Packages"
+  mv "$INDEX.tmp" "$INDEX"
 fi
 
 for pkg in $PACKAGES; do
-  file="$(awk -v p="$pkg" '$1=="Package:"&&$2==p{f=1} f&&$1=="Filename:"{print $2; exit}' "$VENDOR/Packages")"
+  file="$(awk -v p="$pkg" '$1=="Package:"&&$2==p{f=1} f&&$1=="Filename:"{print $2; exit}' "$INDEX")"
   [ -n "$file" ] || { echo "FATAL: package $pkg not in $REPO ($DIST)" >&2; exit 1; }
-  deb="$VENDOR/debs/$(basename "$file")"
+  deb="$DEBS/$(basename "$file")"
   if [ ! -s "$deb" ]; then
     echo ">> downloading $pkg"
-    curl -fsSL -o "$deb.part" "$REPO/$file" && mv "$deb.part" "$deb"
+    curl -fsSL -o "$deb.part" "$REPO/$file" \
+      || { echo "FATAL: cannot download $REPO/$file" >&2; exit 1; }
+    mv "$deb.part" "$deb"
   fi
-  dpkg -x "$deb" "$VENDOR/extract"
+  dpkg -x "$deb" "$EXTRACT"
 done
 
 echo ">> overlaying the extracted toolchain on a symlink copy of $HOST_ROCM"
 rm -rf "$VENDOR/prefix"
 mkdir -p "$VENDOR/prefix"
 cp -rs "$HOST_ROCM"/. "$VENDOR/prefix"/
-cp -rsf "$VENDOR/extract/opt/rocm-$ROCM_VERSION"/. "$VENDOR/prefix"/
+cp -rsf "$EXTRACT/opt/rocm-$ROCM_VERSION"/. "$VENDOR/prefix"/
 
 export ROCM_PATH="$VENDOR/prefix" HIP_PATH="$VENDOR/prefix"
 "$ROCM_PATH/bin/hipcc" --version | head -2 \

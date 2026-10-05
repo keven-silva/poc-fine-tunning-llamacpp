@@ -111,7 +111,7 @@ def main() -> int:
 <div class="wrap">
 <h1>Qwen3-8B persona fine-tune &mdash; base vs tuned</h1>
 <p class="sub">{results['n_rows']} held-out rows &middot; prompt version
-{html.escape(results['prompt_version'])} &middot; Q4_K_M on RTX 3070 Ti &middot; identical
+{html.escape(results['prompt_version'])} &middot; Q4_K_M &middot; identical
 decoding parameters</p>
 <div class="tablewrap">
 <table>

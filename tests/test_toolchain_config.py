@@ -118,3 +118,17 @@ def test_unsloth_and_zoo_lock_to_the_same_recent_release_family():
     family = {n: tuple(int(x) for x in pkgs[n].split(".")[:2]) for n in ("unsloth", "unsloth-zoo")}
     assert family["unsloth"] == family["unsloth-zoo"], family
     assert family["unsloth"] >= (2026, 9), family
+
+
+def test_no_nvidia_text_left_in_live_files():
+    for path in ("scripts/06_report.py", "scripts/04_serve.sh", "Makefile",
+                 "scripts/00_setup_llamacpp.sh", "scripts/00_setup_rocm.sh"):
+        text = _read(path)
+        assert "RTX" not in text and "CUDA" not in text.replace("PYTORCH_CUDA_ALLOC_CONF", ""), path
+
+
+def test_claude_md_describes_the_current_hardware():
+    text = _read("CLAUDE.md")
+    assert "RX 7600" in text and "ROCm" in text
+    assert "vendor/rocm" in text
+    assert "vendor/cuda" not in text

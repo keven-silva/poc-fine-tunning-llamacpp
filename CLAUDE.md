@@ -2,8 +2,8 @@
 
 Fine-tune **Qwen3-8B** with **Unsloth QLoRA** on NVIDIA's synthetic Brazilian persona
 corpus, export to **GGUF**, serve and evaluate with **llama.cpp** — originally on a single
-RTX 3060 (12GB). **This fork targets an RTX 3070 Ti (8GB)** — see ADR 0013 and 0014 for what
-that changes.
+RTX 3060 (12GB). **This fork targets a Radeon RX 7600 (8GB, ROCm)** — see ADR 0014 for the 8GB
+constraints and ADR 0015/0016 for the ROCm migration.
 
 **Task:** demographic attributes in, six-section Brazilian-Portuguese persona narrative out.
 
@@ -16,13 +16,13 @@ that changes.
 
 | | |
 |---|---|
-| GPU | RTX 3070 Ti **8GB**, ~7.2GB free (GNOME holds ~0.3-0.4GB) |
+| GPU | Radeon RX 7600 **8GB** (gfx1102), ~8.0GB visible |
 | RAM / disk | 31GB / 259GB free |
-| Driver / CUDA | 580.178.04, Ampere `sm_86`; **no system CUDA toolkit** — `vendor/cuda` (12.8.1) |
+| ROCm | host 7.1.1 (`/opt/rocm-7.1.1`); torch 2.11.0 wheel from the `rocm7.1` index; HIP toolchain in `vendor/rocm` (~4GB) |
 | Python | always use the project `uv` venv on 3.12, never the host Python |
 
 Earlier ADRs, the design spec and `docs/RESULTS.md` were written for and measured on the
-RTX 3060 12GB. They are the historical record; do not rewrite their numbers.
+RTX 3060 12GB (and the RTX 3070 Ti 8GB). They are the historical record; do not rewrite their numbers.
 
 Never `pip install` into the host Python. Use `uv run` / `uv sync`; dependencies are
 pinned in the committed `uv.lock` (ADR 0011).
@@ -55,8 +55,13 @@ multi-hour training run.
 
 ## VRAM
 
-Training peaks at **~7.1GB of 7.65GB** (ADR 0014) and only fits because of three settings
-in the config. Do not undo any of them on this card:
+Training peak and s/step on the RX 7600 are **not measured**. ADR 0014 measured a
+7.06-7.10GB peak on the 3070 Ti (7.65GB visible, desktop ~0.3-0.4GB); the three settings
+below are what got it there, and they are unchanged. Do not undo any of them on this card.
+The smoke run on the RX 7600 (7.98 GiB total) started and then hit `OutOfMemoryError` at
+the step-1 backward pass (7.18 GiB allocated, 94 MiB free) with the desktop and browser
+holding ~1.28GB of VRAM (ADR 0015). Train from a TTY or with the browser closed, and
+record the measured peak in a follow-up ADR.
 
 - `model.train_id: unsloth/Qwen3-8B-bnb-4bit` — the standard 4-bit checkpoint (5.66GB).
   `unsloth/Qwen3-8B` resolves to the dynamic one (6.97GB), which fails at load.
@@ -64,10 +69,10 @@ in the config. Do not undo any of them on this card:
 - `train.eval_strategy: "no"` — an in-training eval pass materialises full fp32 logits and
   OOMs.
 
-The margin is ~0.5GB: train with the desktop light or from a TTY. There is no further
-fallback short of a smaller base model.
+There is no further fallback short of a smaller base model.
 
-Serving fits: Q4_K_M 8B with `-ngl 99 -c 4096` peaks at ~5.5GB.
+Serving VRAM for Q4_K_M 8B on this card is also not measured (~5.5GB on the 3070 Ti, ADR
+0013/0014); only a small-model generation check was run (ADR 0016).
 
 ## Operational gotchas found the hard way
 
@@ -85,11 +90,21 @@ Serving fits: Q4_K_M 8B with `-ngl 99 -c 4096` peaks at ~5.5GB.
 - **`datasets` streaming aborts the process at interpreter shutdown**, turning a
   successful run into exit 134. `scripts/01_prepare_data.py` exits via `os._exit` after
   flushing.
-- **The llama.cpp build needs `nvcc`, which the torch wheels do not ship.** This host has
-  no system toolkit and no passwordless sudo, so `scripts/00_setup_cuda.sh` installs one
-  into `vendor/cuda` with micromamba, and `00_setup_llamacpp.sh` bakes its lib dir into the
-  rpath. Without that rpath the binaries build fine and then fail at launch with
-  `libcudart.so.12: cannot open shared object file`.
+- **The llama.cpp build needs `hipcc`, which the host does not ship** (runtime only, no
+  sudo). `scripts/00_setup_rocm.sh` extracts AMD's 7.1.1 packages into `vendor/rocm` (~4GB)
+  and overlays them on the host tree; `00_setup_llamacpp.sh` then asserts the binaries find
+  the GPU with `LD_LIBRARY_PATH` unset.
+- **The torch wheel's HIP runtime must match the host ROCm.** The `rocm7.14` wheel
+  segfaulted (exit 139) at the first kernel on a 7.1.1 host while
+  `torch.cuda.is_available()` was still `True`. `make setup` runs a real matmul
+  (`scripts/00_check_gpu.py`). Never add a `rocm*` pip package (ADR 0015).
+- **Pinning torch backtracked unsloth and transformers.** `torch==2.13.0` resolved an old
+  unsloth beside a newer zoo and transformers 5.3.0, which broke `make train`. The pin is
+  `torch==2.11.0` (`rocm7.1` index); after changing it run `uv lock --upgrade`, since plain
+  `uv lock` keeps the previous resolution. A test requires unsloth and unsloth-zoo to share
+  a 2026.9+ release.
+- **Clear `LD_LIBRARY_PATH` for GPU runs.** The shell exports non-existent ROCm dirs; the
+  Makefile uses `GPU_ENV = env -u LD_LIBRARY_PATH`.
 - **triton needs `Python.h` at the first training step.** A distro Python without its
   `-dev` package fails there with a gcc error, minutes in. `pyproject.toml` sets
   `python-preference = "only-managed"` so the venv uses uv's CPython, which ships headers.

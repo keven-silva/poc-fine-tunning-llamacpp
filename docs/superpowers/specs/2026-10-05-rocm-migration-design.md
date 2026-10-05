@@ -1,7 +1,7 @@
 # Design — Migration from NVIDIA CUDA to AMD ROCm (RX 7600 8GB)
 
 - **Date:** 2026-10-05
-- **Status:** Draft, awaiting review
+- **Status:** Approved; implemented by docs/superpowers/plans/2026-10-05-rocm-migration.md
 - **Extends:** [2026-09-12-persona-finetune-design.md](2026-09-12-persona-finetune-design.md)
   (sections 3 and 4 only; the task, data, prompt and evaluation design are unchanged)
 
@@ -54,7 +54,7 @@ Preloading the host's 7.1.1 `libamdhip64` makes the same script work. `amd-smi` 
 
 | Check | Result |
 |---|---|
-| `torch 2.13.0+rocm7.1`, matmul bf16, no override | works |
+| `torch 2.13.0+rocm7.1` (probe; superseded by 2.11.0, see note in 3.1), matmul bf16, no override | works |
 | `bitsandbytes 0.50.2` 4-bit quantise on GPU | works |
 | `unsloth 2026.3.11` + `unsloth-zoo 2026.9.9`, `triton 3.8.0`, transformers 5.3.0, trl 0.24.0, peft 0.21.2 | resolve and import |
 | `unsloth/Qwen3-8B-bnb-4bit`, `use_exact_model_name=True`, `max_seq_length=1536` | loads, **5.74GB reserved** (3070 Ti: 5.73GB) |
@@ -70,9 +70,10 @@ the `make smoke` acceptance steps.
 ### 3.1 Python environment (supersedes the CUDA parts of ADR 0011)
 
 - `pyproject.toml`: index `pytorch-rocm` → `https://download.pytorch.org/whl/rocm7.1`;
-  `torch==2.13.0` and `torchvision` both sourced from it. The comment states the rule:
+  `torch==2.11.0` and `torchvision` both sourced from it. The comment states the rule:
   **the wheel's HIP runtime must match the host ROCm**, which is the opposite of the CUDA
   backward-compatibility argument in ADR 0011.
+- Note: the 2.13.0 validation probe was superseded. Pinning it made the resolver backtrack unsloth and transformers to a mismatched older set, so the pin is 2.11.0 (see ADR 0015).
 - Do not add `rocm-sdk-core` or any `rocm*` pip package. The host runtime is the one in use.
 - `unsloth` and `unsloth-zoo` stay unpinned and are resolved as a coupled set, per `CLAUDE.md`.
 - Recreate the venv from scratch (`uv sync --reinstall`), then relock. The stale triton
@@ -103,7 +104,7 @@ Replaces the `hipcc`-on-PATH check, which cannot succeed on this host. Same role
    the extracted files. This is the `ROCM_PATH` for the build.
 5. Verify `hipcc --version`, and `/dev/kfd` read/write access as today.
 
-Cost: ~2.1GB extracted plus ~540MB of downloads, untracked by git (`vendor/` is ignored).
+Cost: ~4GB in total (extracted tree plus downloaded packages; the early ~2.1GB + ~540MB estimate was too low), untracked by git (`vendor/` is ignored).
 The script is idempotent and skips packages already extracted.
 
 ### 3.4 llama.cpp build (`scripts/00_setup_llamacpp.sh`)
@@ -137,12 +138,12 @@ The script is idempotent and skips packages already extracted.
 
 | File | Change |
 |---|---|
-| `pyproject.toml`, `uv.lock` | rocm7.1 index, torch 2.13.0, relock |
+| `pyproject.toml`, `uv.lock` | rocm7.1 index, torch 2.11.0, relock |
 | `Makefile` | per 3.2 and 3.5 |
 | `scripts/00_setup_rocm.sh`, `00_setup_llamacpp.sh` | per 3.3 and 3.4 |
 | `scripts/00_setup_cuda.sh` | removed (no CUDA path remains; recoverable from git) |
 | `scripts/04_serve.sh` | VRAM comment ("~9.5GB free" → measured figure for this card) |
-| `scripts/06_report.py` | report footer "RTX 3070 Ti" → GPU name read from the results, no hardcoded card |
+| `scripts/06_report.py` | report footer no longer names a card |
 | `docs/adr/0015-target-hardware-rx-7600-rocm.md` | new: hardware, ROCm 7.1 wheel rule, measured VRAM/time; amends 0013 |
 | `docs/adr/0016-llamacpp-hip-local-toolchain.md` | new: toolchain in `vendor/rocm`; Vulkan and ROCm 7.14 rejected, with measurements |
 | `docs/adr/README.md` | index rows for 0015, 0016; 0013 status "Superseded by 0015" |
@@ -176,7 +177,7 @@ marked by the status column, not edited in their bodies.
 
 ## 5. Verification plan
 
-1. `uv sync` from the new lock; assert installed `torch` is `2.13.0+rocm7.1`, and that
+1. `uv sync` from the new lock; assert installed `torch` is `2.11.0+rocm7.1`, and that
    `pytorch-triton-rocm` and `triton-rocm` are absent.
 2. `make setup` end to end on a clean tree.
 3. `uv run pytest` (prompt-parity tests do not need the GPU).

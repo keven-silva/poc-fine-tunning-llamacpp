@@ -47,6 +47,8 @@ excluded.
 Hardware: RTX 3060 12GB (~9.5GB free with GNOME resident), 30GB RAM, 304GB disk,
 driver 595.84 / CUDA 13.3.
 
+> GPU toolchain superseded for the AMD fork: see [2026-10-05-rocm-migration-design.md](2026-10-05-rocm-migration-design.md).
+
 ## 4. Pipeline
 
 Six stages, each a standalone resumable script behind one `Makefile` target and one YAML

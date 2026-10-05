@@ -2,11 +2,13 @@
 
 Fine-tunes Qwen3-8B with Unsloth QLoRA on `nvidia/Nemotron-Personas-Brazil`, exports to
 GGUF, and evaluates against the base model through llama.cpp. Everything runs on one GPU:
-first an RTX 3060 12GB, and now, in this fork, an **RTX 3070 Ti 8GB**.
+first an RTX 3060 12GB, then an RTX 3070 Ti 8GB, and now, in this fork, a **Radeon RX 7600 8GB** (ROCm 7.1).
 
 On 8GB, training fits with the standard 4-bit checkpoint, batch 1 and in-training
 evaluation off, at a 7.1GB peak. See [ADR 0013](docs/adr/0013-target-hardware-rtx-3070-ti.md)
 and [ADR 0014](docs/adr/0014-training-qwen3-8b-on-8gb.md).
+
+This tree now targets an RX 7600 8GB with ROCm ([ADR 0015](docs/adr/0015-target-hardware-rx-7600-rocm.md)); the tables below are the NVIDIA runs.
 
 **Task:** demographic attributes in, six-section Brazilian-Portuguese persona out.
 
@@ -131,7 +133,7 @@ Measured end to end on each card.
 
 | Stage | Command | RTX 3070 Ti 8GB | RTX 3060 12GB | Produces |
 |---|---|---|---|---|
-| Environment + llama.cpp CUDA build | `make setup` | ~25 min* | ~25 min* | venv + `llama-server`/`quantize`/`perplexity` |
+| Environment + llama.cpp HIP build | `make setup` | ~25 min* | ~25 min* | venv + `llama-server`/`quantize`/`perplexity` |
 | Data preparation | `make data` | ~2 min* | ~3 min* | 10k/500/200 JSONL splits |
 | **Fine-tuning (QLoRA)** | `make train` | **4h 26m** | **7h 25m** | 344 MB LoRA adapter |
 | GGUF export (per model) | `make export` | **6 min 13 s** | **6 min 26 s** | 4.7 GB Q4_K_M + 8.1 GB Q8_0 |
@@ -184,7 +186,7 @@ Base and tuned are evaluated **sequentially, never concurrently**: two Q4_K_M 8B
 ## Quickstart
 
 ```bash
-make setup    # uv venv (Python 3.12) + CUDA build of llama.cpp
+make setup    # uv venv (Python 3.12) + HIP build of llama.cpp
 make smoke    # 200-row end-to-end check — run this first
 make data     # 10k/500/200 splits
 make train    # 4h 26m QLoRA on the 3070 Ti (measured)
@@ -195,12 +197,12 @@ make report   # outputs/eval/report.html
 
 ## Requirements
 
-An 8GB NVIDIA GPU with ~7.6GB free: training peaks at ~7.1GB, serving at ~5.5GB. 30GB RAM · 60GB free disk · NVIDIA driver 535+ · a C++ compiler.
+An AMD RX 7600 8GB with ROCm 7.1 (~8GB visible). Training peak and serving VRAM on this card are not yet measured: the first smoke run hit an OOM at step 1 with the desktop resident (~1.28GB), so train from a TTY or with the browser closed ([ADR 0015](docs/adr/0015-target-hardware-rx-7600-rocm.md)). 30GB RAM · 60GB free disk · a C++ compiler.
 
 Host Python is not used — `uv` manages a project-local 3.12 environment, and `cmake`
-is installed into it. If the host has no CUDA toolkit, `make setup` installs one into
-`vendor/cuda` with micromamba (~2.3GB, no root), so the only system package needed is a
-compiler.
+is installed into it. If the host has the ROCm 7.1.1 runtime but no compiler, `make setup`
+downloads AMD's HIP packages into `vendor/rocm` (~4GB, no root), so the only system package
+needed is a C++ compiler.
 
 ## Pinning llama.cpp
 

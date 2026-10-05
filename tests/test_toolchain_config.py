@@ -39,3 +39,30 @@ def test_lock_resolves_the_rocm71_wheel_and_no_foreign_runtimes():
     pkgs = {p["name"]: p for p in tomllib.loads(lock_text)["package"]}
     for name in ("triton", "triton-rocm"):
         assert pkgs[name]["source"] == {"registry": "https://download.pytorch.org/whl/rocm7.1"}
+
+
+import re
+
+
+def test_makefile_has_no_hsa_overrides():
+    makefile = _read("Makefile")
+    for var in ("HSA_OVERRIDE_GFX_VERSION", "HIPBLASLT_ENABLE_CK",
+                "PYTORCH_TUNABLEOP_ENABLED"):
+        assert var not in makefile
+
+
+def test_gpu_recipes_clear_ld_library_path():
+    makefile = _read("Makefile")
+    assert re.search(r"^GPU_ENV\s*=\s*env -u LD_LIBRARY_PATH$", makefile, re.M)
+    for script in ("00_check_gpu.py", "02_train.py", "03_export_gguf.py", "05_evaluate.py"):
+        lines = [l for l in makefile.splitlines() if script in l]
+        assert lines, f"{script} not run by the Makefile"
+        assert all("$(GPU_ENV)" in l for l in lines), script
+
+
+def test_setup_runs_the_real_kernel_check_before_building():
+    setup = _read("Makefile").split("setup:", 1)[1].split("\ndata:", 1)[0]
+    order = [setup.index(s) for s in ("sync", "00_check_gpu.py", "00_setup_rocm.sh",
+                                      "00_setup_llamacpp.sh")]
+    assert order == sorted(order)
+    assert "is_available" not in setup

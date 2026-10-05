@@ -22,7 +22,7 @@ def test_torch_comes_from_the_rocm71_index():
 
 def test_torch_is_pinned_to_the_version_validated_on_the_host():
     train = tomllib.loads(_read("pyproject.toml"))["project"]["optional-dependencies"]["train"]
-    assert "torch==2.13.0" in train
+    assert "torch==2.11.0" in train
 
 
 def test_unsloth_and_zoo_are_not_pinned_individually():
@@ -109,3 +109,12 @@ def test_serve_script_clears_ld_library_path_and_has_no_stale_vram_claim():
     text = _read("scripts/04_serve.sh")
     assert "unset LD_LIBRARY_PATH" in text
     assert "9.5GB" not in text
+
+
+def test_unsloth_and_zoo_lock_to_the_same_recent_release_family():
+    # Coupled set (see CLAUDE.md): the resolver once backtracked to an 8-month-old
+    # unsloth beside a newer zoo. Both must share year.month and be >= 2026.9.
+    pkgs = {p["name"]: p["version"] for p in tomllib.loads(_read("uv.lock"))["package"]}
+    family = {n: tuple(int(x) for x in pkgs[n].split(".")[:2]) for n in ("unsloth", "unsloth-zoo")}
+    assert family["unsloth"] == family["unsloth-zoo"], family
+    assert family["unsloth"] >= (2026, 9), family

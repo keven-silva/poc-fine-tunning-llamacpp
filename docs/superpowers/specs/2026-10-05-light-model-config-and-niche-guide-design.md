@@ -1,7 +1,7 @@
 # Design — Light-model config for learning, and a guide to new niches
 
 - **Date:** 2026-10-05
-- **Status:** Draft, awaiting review
+- **Status:** Implemented (see docs/superpowers/plans/2026-10-05-light-model-config.md and ADR 0017)
 - **Extends:** [2026-09-12-persona-finetune-design.md](2026-09-12-persona-finetune-design.md) and
   [2026-10-05-rocm-migration-design.md](2026-10-05-rocm-migration-design.md). The task, prompt,
   data source and evaluation are unchanged.
@@ -57,7 +57,7 @@ touching the 8B config or its results, changing any invariant in `CLAUDE.md`.
   The fp32 logits over the 151,936-token vocabulary do not depend on model size, so the claim
   that ADR 0014's constraints "do not apply" to a 0.6B model was wrong for batch size. The
   config keeps batch 1 x 16.
-- **Disk is the binding constraint.** The host has ~5.5GB free (2026-10-05). Qwen3-0.6B needs
+- **Disk is the binding constraint.** The host has ~5.5GB free (2026-10-05, at the time). Qwen3-0.6B needs
   about 5GB at peak (fp16 base 1.2GB, merged 1.2GB, f16 GGUF 1.2GB, Q4 ~0.4GB, caches); 1.7B
   needs ~12GB and 4B ~25GB.
 
@@ -148,8 +148,8 @@ implemented features.
 ### 3.5 ADR 0017
 
 Records: the 0.6B config as a learning configuration; separate `paths.*` rather than separate
-file names; which ADR 0014 constraints do and do not apply and why (batch size does, sequence length does not); the measured numbers from the
-run; disk as the constraint on larger models; the rejected alternative of refactoring to a
+file names; which ADR 0014 constraints do and do not apply and why (batch size does, sequence length
+does not); the measured numbers from the run; disk as the constraint on larger models; the rejected alternative of refactoring to a
 multi-task framework now. Marks no earlier ADR superseded; it adds a configuration.
 
 ## 4. Risks

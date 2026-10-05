@@ -1,5 +1,7 @@
 # Light configuration for learning (ADR 0017): the same persona task as the 8B config, on
-# Qwen3-0.6B. It trains in minutes, so every stage can be run and read end to end.
+# Qwen3-0.6B. It takes about 47 minutes of training (~20 s per step) on this card, so every stage can be
+# run and read end to end. It is NOT light on memory: 7.20 GB reserved peak, and the whole card
+# reached 8.07 GB with the desktop, so train with the desktop light or from a TTY, as for the 8B.
 #
 # Only these things differ from configs/qwen3-8b-personas.yaml: the model ids, the sequence
 # length, the number of training rows, in-training evaluation (on again, see below), the two
@@ -12,9 +14,11 @@
 # optimizer step with VRAM at 7.89 of 8.0 GB, because the fp32 logits over the 151,936-token
 # vocabulary cost the same whatever the model size (ADR 0014).
 #
-# To move to a bigger model, edit ONLY model.base_id, model.train_id, paths.data_dir and
-# paths.outputs_dir. Free disk needed at peak for the export stage: 0.6B ~5GB, 1.7B ~12GB,
-# 4B ~25GB. Examples: unsloth/Qwen3-1.7B (+ -bnb-4bit), unsloth/Qwen3-4B (+ -bnb-4bit).
+# To move to a bigger model, edit those four (model.base_id, model.train_id, paths.data_dir and
+# paths.outputs_dir) and re-measure seconds per step and VRAM before a full run (the batch shape
+# of the 0.6B is not validated for larger models). Disk: the full 0.6B run used ~7GB net
+# (measured; it includes downloads, the GGUFs and the leftover outputs/qwen3-0.6b/merged-16bit-*
+# directories). For 1.7B (~12GB) and 4B (~25GB) those are rough estimates, not measurements. Examples: unsloth/Qwen3-1.7B (+ -bnb-4bit), unsloth/Qwen3-4B (+ -bnb-4bit).
 # Use `make <stage> CONFIG=configs/qwen3-0.6b-personas.yaml`.
 
 model:

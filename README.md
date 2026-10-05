@@ -197,7 +197,7 @@ make report   # outputs/eval/report.html
 
 ### Learning with a light model
 
-`configs/qwen3-0.6b-personas.yaml` runs the same pipeline on Qwen3-0.6B in minutes
+`configs/qwen3-0.6b-personas.yaml` runs the same pipeline on Qwen3-0.6B (about 47 minutes of training, ~20 s per step, on this card)
 (`make train CONFIG=configs/qwen3-0.6b-personas.yaml`, same for the other stages), keeping its
 data and outputs under `data/qwen3-0.6b` and `outputs/qwen3-0.6b`. The guide
 [docs/guides/adapting-to-a-new-niche.md](docs/guides/adapting-to-a-new-niche.md) explains each

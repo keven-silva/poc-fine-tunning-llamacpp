@@ -28,8 +28,8 @@ Decisões por trás de cada passo estão em `docs/adr/README.md`.
 
 ## 2. Passo a passo com a config leve
 
-A config `configs/qwen3-0.6b-personas.yaml` usa o Qwen3-0.6B: treina em minutos. Todos os
-comandos recebem `CONFIG=`:
+A config `configs/qwen3-0.6b-personas.yaml` usa o Qwen3-0.6B: cerca de 47 min de treino (~20 s por passo) nesta
+placa. Todos os comandos recebem `CONFIG=`:
 
 ```
 make data   CONFIG=configs/qwen3-0.6b-personas.yaml
@@ -39,6 +39,10 @@ make eval   CONFIG=configs/qwen3-0.6b-personas.yaml
 make report CONFIG=configs/qwen3-0.6b-personas.yaml
 ```
 
+**Atenção à memória:** o 0,6B não é leve em VRAM. O pico reservado foi de 7,20 GB, e o total da
+placa, com a área de trabalho, chegou a 8,07 GB (nada deu OOM, mas a placa ficou cheia). Treine
+com o desktop leve ou a partir de um TTY, como no 8B (`CLAUDE.md`).
+
 O que cada etapa faz e como ler a saída:
 
 1. **`make data`** (`scripts/01_prepare_data.py`): baixa o dataset, monta o texto de cada
@@ -47,7 +51,9 @@ O que cada etapa faz e como ler a saída:
 2. **`make train`** (`scripts/02_train.py`): imprime a *loss* a cada 5 passos. Ela deve cair
    rápido no começo e depois estabilizar. Com a avaliação ligada, aparece também a *eval_loss*
    (validação) a cada 25 passos: se a loss de treino cai e a de validação sobe, é overfitting.
-   Ao final há uma linha com o tempo e o **pico de VRAM**.
+   Ao final há uma linha com o tempo e o **pico de VRAM**. O tempo por passo aparece no tqdm
+   (`s/it`): é estável e fica mais lento durante as passagens de validação. Cerca de 20 s por
+   passo é normal para esta pilha nesta placa.
 3. **`make export`** (`scripts/03_export_gguf.py`): funde o adaptador, converte e quantiza.
    Gera os GGUF do modelo *tuned* e do *base* pelo mesmo caminho, para que a comparação meça
    só o LoRA.
@@ -57,10 +63,18 @@ O que cada etapa faz e como ler a saída:
 5. **`make report`** (`scripts/06_report.py`): gera uma página com as métricas e exemplos
    lado a lado.
 
-Como ler a tabela do eval: o modelo base costuma ter **validade de formato 0** (não sabe as seis
-seções) e o tuned perto de 1; a perplexidade do tuned deve ser menor. Num modelo pequeno, espere
-ganhos de formato claros e ganhos de qualidade de conteúdo mais modestos. Isso também é
-aprendizado.
+Como ler a tabela do eval: o modelo base tem **validade de formato 0** (não sabe as seis
+seções) e a perplexidade do tuned é menor. Medido no 0,6B (200 linhas), base -> tuned:
+perplexidade 10,7 -> 6,0; validade de formato 0 -> 0,825; grounding 0,95 -> 0,87. Ou seja, o
+0,6B aprende o formato, mas perde precisão nos campos de entrada (estado e ocupação caíram).
+Isso é aprendizado: é o que um modelo pequeno faz. Os números completos estão na
+`docs/adr/0017-light-model-config-for-learning.md`.
+
+**Limpeza e pastas aninhadas:** `make clean` não alcança `outputs/qwen3-0.6b/`. Os diretórios
+`merged-16bit-*` que sobram do export podem ser removidos com
+`rm -rf outputs/qwen3-0.6b/merged-16bit-*` (o script de export já apaga o arquivo f16). Cuidado:
+`rm -rf data` ou `rm -rf outputs` apaga os arquivos das DUAS configs, porque as pastas do 0,6B
+ficam dentro delas.
 
 ## 3. O que muda entre o 8B e o 0.6B
 
@@ -68,20 +82,27 @@ aprendizado.
 |---|---|---|---|
 | `model.base_id` / `train_id` | Qwen3-8B | Qwen3-0.6B | o objetivo do exercício |
 | `model.max_seq_length` | 1536 | 2048 | o limite do 8B era para caber em 8GB |
-| `data.n_train` | 10000 | 2000 | minutos em vez de horas |
+| `data.n_train` | 10000 | 2000 | poucas dezenas de minutos em vez de horas |
 | batch × acumulação | 1 × 16 | 1 × 16 | idêntico: os logits sobre o vocabulário (151.936 tokens) custam a mesma memória em qualquer tamanho de modelo (medido: batch 4 × 2048 rodou a ~60 s/passo com a VRAM no limite) |
 | `train.eval_strategy` | `"no"` | `"steps"` | avaliação ligada de novo: `prediction_loss_only` e batch 1 mantêm o custo baixo |
+| `train.logging_steps` / `eval_steps` / `save_steps` / `save_total_limit` | 10 / 100 / 250 / 3 | 5 / 25 / 100 / 1 | só 125 passos e pouco disco; não afeta o modelo |
 | `paths.*` | `data`, `outputs` | `data/qwen3-0.6b`, `outputs/qwen3-0.6b` | não sobrescrever o 8B |
 
 Todo o resto é idêntico (LoRA, learning rate, decodificação, sementes). Assim, comparar os dois
-isola o efeito do tamanho. Para subir para 1,7B ou 4B, edite apenas os ids do modelo e os dois
-caminhos, e confira o disco livre necessário no topo do YAML.
+isola o efeito do tamanho. Para subir para 1,7B ou 4B, edite esses quatro (`model.base_id`,
+`model.train_id` e os dois caminhos) e meça de novo os segundos por passo e a VRAM antes de uma
+rodada completa: o formato de batch do 0,6B não foi validado para modelos maiores. As estimativas
+de disco estão no topo do YAML.
+
+O 0,6B também não é leve em memória: pico de 7,20 GB reservados e 8,07 GB no total da placa com
+o desktop. Treine com o desktop leve ou de um TTY, como no 8B.
 
 ## 4. Mapa do código: o que é do nicho e o que não é
 
 **Independente do nicho** (reaproveite como está):
 
-- o laço de treino e o LoRA: `scripts/02_train.py`
+- o laço de treino e o LoRA: `scripts/02_train.py` (o laço não depende do nicho, mas o script
+  importa `PROMPT_VERSION` e lê os JSONL de persona)
 - fusão, conversão e quantização: `scripts/03_export_gguf.py`
 - o servidor e o caminho `/completion`: `scripts/04_serve.sh`, `src/personas/llm.py`
 - a leitura da config: `src/personas/config.py`
@@ -171,7 +192,7 @@ rodar o projeto; ela mostra como você acrescentaria o W&B para aprender e compa
    sintético, então logar métricas e gerações é seguro. Em um nicho com texto sensível (logs de
    clientes em cyber security, conteúdo político de pessoas reais), logue **só números** ou use
    o modo offline: `WANDB_MODE=offline`. Os dados ficam na pasta local `wandb/` e você os envia
-   depois, se quiser, com `wandb sync wandb/run-<data>-<id>`. Ao adotar, adicione `wandb/` ao
+   depois, se quiser, com `wandb sync wandb/offline-run-*`. Ao adotar, adicione `wandb/` ao
    `.gitignore`.
 
 ### 9.2 Avaliação: logar o resultado do `make eval`

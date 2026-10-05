@@ -41,7 +41,7 @@ project (see the guide).
 
 ## Consequences
 
-- Measured on the RX 7600 8GB (2026-10-05), 2000 training rows, 125 optimizer steps at the
+- Measured on the RTX 3070 Ti 8GB (2026-10-05), 2000 training rows, 125 optimizer steps at the
   1 × 16 shape: training took 2818 s (47 minutes), about 22.5 s per optimizer step by wall
   time (the script measured 21.09 s; early steps ran ~19.5 s and rose to ~33 s around the
   validation passes). The script reported a peak of 7.20 GB of VRAM (reserved memory). Total
@@ -69,14 +69,22 @@ project (see the guide).
   with `scripts/04_serve.sh`, the eval's exact request body, concurrency 2) answered 24 of 24
   requests in 5-10 s with EOS, and an unchanged re-run of `make eval` passed. The cause is
   unexplained and was not reproduced.
-- Free disk went from 134 GB to 127 GB over the run; the export needed the per-model cleanup
-  of the f16 and merged intermediates (documented in the run, not automated).
+- Free disk went from 134 GB to 127 GB over the run (about 7 GB net, including model
+  downloads, the 397 MB Q4_K_M and 639 MB q8_0 GGUFs and the leftover merged directories).
+  The export script removes the f16 file itself, but the `merged-16bit-*` directories are left
+  behind and `make clean` does not reach `outputs/qwen3-0.6b/` (it only covers the 8B layout),
+  so cleaning those is manual: `rm -rf outputs/qwen3-0.6b/merged-16bit-*`.
 - The 8B files under `data/` and `outputs/` were compared before and after the run: untouched.
 - The 0.6B folders live inside `data/` and `outputs/`, so deleting those two folders removes
   both configs' files.
 - Larger models (1.7B, 4B) need only the model ids and the two paths changed, plus the disk
   noted at the top of the config (~12GB and ~25GB at the export peak). Their batch shape must
   be re-measured, since the logits cost does not shrink with the model.
+- ADR 0014's constraints, one by one. Batch size carries over: the fp32 logits over the
+  vocabulary do not depend on model size, so the 0.6B keeps batch 1 x 16, and the evaluation
+  batch is 1 as in the 8B config. Sequence length does not carry over: 2048 is used here
+  because the 1536 limit was set by the 8B's memory. The standard 4-bit checkpoint is used for
+  consistency, and in-training evaluation is back on (`eval_strategy: "steps"`).
 - No earlier ADR is superseded; ADR 0014's constraints still hold for the 8B config.
 
 ## Alternatives considered
@@ -88,5 +96,7 @@ project (see the guide).
   names from the stage, and two runs would still overwrite `adapter/` and the eval results.
 - **Batch 4 × 4 for speed.** Tried first and measured, see Decision 1; ~60 s/step, memory at
   the limit, and an out-of-memory failure in a second attempt.
-- **Start from 1.7B.** More capable, but ~12GB at the export peak against ~5GB free disk when
-  this was decided.
+- **Start from 1.7B.** More capable, but ~12GB at the export peak (a rough estimate), and the
+  disk was nearly full when the config was designed. It was cleared before the run (134 GB
+  free), so disk is no longer the obstacle it looked like, but the 1.7B batch shape would
+  still need to be measured.

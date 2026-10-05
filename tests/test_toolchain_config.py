@@ -1,4 +1,6 @@
 """Guards for the ROCm toolchain rules (ADR 0015/0016). Pure file checks: no GPU needed."""
+import re
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -66,3 +68,19 @@ def test_setup_runs_the_real_kernel_check_before_building():
                                       "00_setup_llamacpp.sh")]
     assert order == sorted(order)
     assert "is_available" not in setup
+
+
+def test_rocm_setup_script_is_valid_bash_and_idempotent_by_design():
+    path = ROOT / "scripts/00_setup_rocm.sh"
+    assert subprocess.run(["bash", "-n", str(path)]).returncode == 0
+    text = path.read_text()
+    for pkg in ("hip-dev", "hipcc", "rocm-llvm", "rocm-device-libs", "hipblas",
+                "hipblas-dev", "rocsolver", "hsa-rocr-dev", "rocm-cmake", "rocm-core"):
+        assert re.search(rf"\b{re.escape(pkg)}\b", text), pkg
+    assert "Packages.gz" in text                 # versions are resolved, never hardcoded
+    assert "$VENDOR/debs/" in text and "-s" in text  # skips already downloaded debs
+    assert "/opt/rocm-" in text                  # follows the host ROCm version
+
+
+def test_no_cuda_setup_remains():
+    assert not (ROOT / "scripts/00_setup_cuda.sh").exists()
